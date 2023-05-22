@@ -572,6 +572,7 @@ class WaterWorldEnv(BaseEnv):
         return True
     
     def see_synthetic_state(self, state, use_velocities):
+        print(len(state))
         self.agent = BallAgent("A", self.ball_radius, [state[0], state[1]], [state[2], state[3]], self.agent_vel_delta, self.agent_vel_max)
         if not use_velocities:
             for i in range((len(state) - 4) / 2):
