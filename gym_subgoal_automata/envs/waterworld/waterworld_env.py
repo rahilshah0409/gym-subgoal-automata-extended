@@ -26,6 +26,7 @@ class WaterWorldObservations:
     BLUE = "b"
     YELLOW = "y"
     MAGENTA = "m"
+    DUMMY = "d"
 
 
 class Ball:
@@ -151,6 +152,7 @@ class WaterWorldEnv(BaseEnv):
         self.use_velocities = utils.get_param(params, "use_velocities", True)
         self.agent_vel_delta = self.ball_velocity
         self.agent_vel_max = 3 * self.ball_velocity
+        self.episode_limit = utils.get_param(params, "episode_limit", 300)
 
         # agent ball and other balls to avoid or touch
         self.agent = None
@@ -189,6 +191,9 @@ class WaterWorldEnv(BaseEnv):
                 return True
         return False
 
+    def get_ball_area(self):
+        return math.pi * (self.ball_radius ** 2)
+    
     def get_observations(self):
         return {b.color for b in self._get_current_collisions()}
 
@@ -377,6 +382,24 @@ class WaterWorldEnv(BaseEnv):
 
         return self._get_features()
 
+    def save_and_render(self, dir_path, base_filename, step_no):
+        if not self.is_rendering:
+            pygame.init()
+            pygame.display.set_caption("Water World")
+            self.game_display = pygame.display.set_mode(
+                (self.max_x, self.max_y))
+            self.is_rendering = True
+
+        self.game_display.fill((255, 255, 255))
+        for ball in self.balls:
+            self._render_ball(self.game_display, ball, 0)
+        self._render_ball(self.game_display, self.agent, 0)
+
+        filename = base_filename + str(step_no) + ".png"
+        path = dir_path + filename
+        pygame.image.save(self.game_display, path)
+        pygame.display.update()
+    
     def render(self, mode='human'):
         if not self.is_rendering:
             pygame.init()
@@ -547,15 +570,58 @@ class WaterWorldEnv(BaseEnv):
             if symbol not in array:
                 return False
         return True
-
-    def play(self):
-        self.reset()
+    
+    def see_synthetic_state(self, state, use_velocities):
+        self.agent = BallAgent("A", self.ball_radius, [state[0], state[1]], [state[2], state[3]], self.agent_vel_delta, self.agent_vel_max)
+        if not use_velocities:
+            for i in range((len(state) - 4) / 2):
+                start_index = 4 + (2 * i)
+                self.balls = []
+                colors = self.get_observables()
+                for c in range(self.ball_num_colors):
+                    for _ in range(self.ball_num_per_color):
+                        color = colors[c]
+                        pos = state[start_index], state[start_index + 1]
+                        vel = 0.0, 0.0
+                        ball = Ball(color, self.ball_radius, pos, vel)
+                        self.balls.append(ball)
+        else:
+            for i in range((len(state) - 4) / 4):
+                start_index = 4 * (i + 1)
+                self.balls = []
+                colors = self.get_observables()
+                for c in range(self.ball_num_colors):
+                    for _ in range(self.ball_num_per_color):
+                        color = colors[c]
+                        pos = state[start_index], state[start_index + 1]
+                        vel = state[start_index + 2], state[start_index + 3]
+                        ball = Ball(color, self.ball_radius, pos, vel)
+                        self.balls.append(ball)
+        
+        self.state = [0] * len(self.sequences)
         self.render()
+
+    def play(self, img_dir_path=None, base_filename=None):
+        state = self.reset()
+        base_filename = base_filename if base_filename is not None else "env_step"
+        step_no = 0
+
+        if img_dir_path == None:
+            self.render()
+        else:
+            self.save_and_render(img_dir_path, base_filename, step_no)
 
         clock = pygame.time.Clock()
 
         t_previous = time.time()
         actions = set()
+
+        actions_list = []
+        states = []
+        states.append(state)
+        events_list = []
+        events_list.append(set())
+        elapsed_times = []
 
         total_reward = 0.0
 
@@ -588,13 +654,17 @@ class WaterWorldEnv(BaseEnv):
                 a = WaterWorldActions.NONE
             else:
                 a = random.choice(list(actions))
+            actions_list.append(a)
 
             # executing the action
             _, reward, is_done, _ = self.step(a, t_delta)
             total_reward += reward
 
             # printing image
-            self.render()
+            if img_dir_path == None:
+                self.render()
+            else:
+                self.save_and_render(img_dir_path, base_filename, step_no)
 
             clock.tick(20)
 
@@ -603,6 +673,20 @@ class WaterWorldEnv(BaseEnv):
         print("Game finished. Total reward: %.2f." % total_reward)
 
         self.close()
+
+        return actions_list, states, events_list, elapsed_times
+
+
+class WaterWorldDummyEnv(WaterWorldEnv):
+    def __init__(self, params=None):
+        sequences = [BallSequence([WaterWorldObservations.DUMMY], False)]
+        super().__init__(params, sequences)
+
+
+class WaterWorldRedEnv(WaterWorldEnv):
+    def __init__(self, params=None):
+        sequences = [BallSequence([WaterWorldObservations.RED], False)]
+        super().__init__(params, sequences)
 
 
 class WaterWorldRedGreenEnv(WaterWorldEnv):
