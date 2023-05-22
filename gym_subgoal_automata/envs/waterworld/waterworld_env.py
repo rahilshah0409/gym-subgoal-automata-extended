@@ -575,7 +575,7 @@ class WaterWorldEnv(BaseEnv):
         print(len(state))
         self.agent = BallAgent("A", self.ball_radius, [state[0], state[1]], [state[2], state[3]], self.agent_vel_delta, self.agent_vel_max)
         if not use_velocities:
-            for i in range((len(state) - 4) / 2):
+            for i in range(math.floor((len(state) - 4) / 2)):
                 start_index = 4 + (2 * i)
                 self.balls = []
                 colors = self.get_observables()
