@@ -571,7 +571,7 @@ class WaterWorldEnv(BaseEnv):
                 return False
         return True
     
-    def see_synthetic_state(self, state, use_velocities):
+    def see_synthetic_state(self, state, use_velocities, img_dir_path=None, fname=None):
         print(len(state))
         self.agent = BallAgent("A", self.ball_radius, [state[0], state[1]], [state[2], state[3]], self.agent_vel_delta, self.agent_vel_max)
         if not use_velocities:
@@ -600,7 +600,10 @@ class WaterWorldEnv(BaseEnv):
                         self.balls.append(ball)
         
         self.state = [0] * len(self.sequences)
-        self.render()
+        if img_dir_path == None:
+            self.render()
+        else:
+            self.save_and_render(img_dir_path, fname, 0)
 
     def play(self, img_dir_path=None, base_filename=None):
         state = self.reset()
